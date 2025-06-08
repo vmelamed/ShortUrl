@@ -88,4 +88,44 @@ public class DataStoreTests
         // Assert
         result.Should().BeEmpty();
     }
+
+    [Fact]
+    public void GetLongUrlRedirects_ReturnsStatistics()
+    {
+        // Arrange
+        var repo = new DataStore();
+        var shortUrl1 = new Uri("https://shor.ty/abc123");
+        var longUrl1 = new Uri("https://example.com/page1");
+        var shortUrl2 = new Uri("https://shor.ty/abc124");
+        var longUrl2 = new Uri("https://example.com/page2");
+
+        // Act
+        repo.AddUrlPair(shortUrl1, longUrl1);
+        repo.GetLongUrl(shortUrl1).Should().Be(longUrl1);
+        repo.GetLongUrl(shortUrl1).Should().Be(longUrl1);
+        repo.AddUrlPair(shortUrl2, longUrl2);
+
+        // Assert
+        repo.GetLongUrlRedirects(shortUrl1).Should().Be(2);
+        repo.GetLongUrlRedirects(shortUrl2).Should().Be(0);
+    }
+
+    [Fact]
+    public void DeleteShortUrl_ReturnsTrueFalse()
+    {
+        // Arrange
+        var repo = new DataStore();
+        var shortUrl1 = new Uri("https://shor.ty/abc123");
+        var longUrl1 = new Uri("https://example.com/page1");
+        var shortUrl2 = new Uri("https://shor.ty/abc124");
+
+        // Act
+        repo.AddUrlPair(shortUrl1, longUrl1);
+        repo.GetLongUrl(shortUrl1).Should().Be(longUrl1);
+        repo.GetLongUrl(shortUrl2).Should().BeNull();
+
+        // Assert
+        repo.DeleteShortUrl(shortUrl1).Should().BeTrue();
+        repo.DeleteShortUrl(shortUrl2).Should().BeFalse();
+    }
 }

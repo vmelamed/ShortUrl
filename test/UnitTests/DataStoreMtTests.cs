@@ -1,8 +1,11 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 
 using FluentAssertions;
 
 using ShortUrl.Services.Repository;
+
+[assembly: ExcludeFromCodeCoverage]
 
 namespace ShortUrl.UnitTests;
 

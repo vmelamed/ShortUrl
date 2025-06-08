@@ -6,7 +6,7 @@ namespace ShortUrl.Services.Repository;
 /// <summary>
 /// Class DataStore. "Stores" the short and long URLs in memory and associated data, simulating a repository.
 /// </summary>
-public class DataStore
+public class DataStore : IDisposable
 {
     readonly ReaderWriterLockSlim _lock = new(LockRecursionPolicy.SupportsRecursion);
     readonly Dictionary<Uri, ShortUrlData> _shortUrls = [];
@@ -105,5 +105,11 @@ public class DataStore
             _longUrls.Remove(longUrl);
 
         return true;
+    }
+
+    public void Dispose()
+    {
+        _lock.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
