@@ -4,7 +4,7 @@ using ShortUrl.Services.Sync;
 
 namespace ShortUrl.UnitTests;
 
-#pragma warning disable xUnit1026, xUnit1031
+#pragma warning disable xUnit1026, xUnit1031, xUnit1044
 
 public class ReaderWriterSyncTests
 {
@@ -45,7 +45,7 @@ public class ReaderWriterSyncTests
         }
 
         // Assert
-        rwLock.IsReadLockHeld.Should().BeFalse();
+        isHeld(rwLock).Should().BeFalse();
     }
 
     [Theory]
@@ -87,7 +87,7 @@ public class ReaderWriterSyncTests
     [ClassData(typeof(RWSyncTestData))]
     public void WaitMs_DoesNotAcquireIfWriteLockHeld(
         Func<ReaderWriterLockSlim, int, IReaderWriterSync> syncFactory,
-        Func<ReaderWriterLockSlim, bool> isHeld)
+        Func<ReaderWriterLockSlim, bool> _)
     {
         // Arrange
         using var rwLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);
@@ -124,7 +124,7 @@ public class ReaderWriterSyncTests
     [ClassData(typeof(RWSyncTestData))]
     public void Dispose_MultipleTimes_DoesNotThrow(
         Func<ReaderWriterLockSlim, int, IReaderWriterSync> syncFactory,
-        Func<ReaderWriterLockSlim, bool> __)
+        Func<ReaderWriterLockSlim, bool> _)
     {
         // Arrange
         using var rwLock = new ReaderWriterLockSlim();
