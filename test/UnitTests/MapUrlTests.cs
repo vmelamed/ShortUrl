@@ -1,110 +1,125 @@
-﻿using FluentAssertions;
-
-using NSubstitute;
+using FluentAssertions;
 
 using ShortUrl.Services;
+using ShortUrl.Services.ObjectModel;
 using ShortUrl.Services.Repository;
 
 namespace ShortUrl.UnitTests;
 
 public class MapUrlTests
 {
+    private readonly DataStore _dataStore = new();
+    private readonly Func<Uri, Uri> _generator = longUrl => new Uri($"https://shor.ty/{Guid.NewGuid()}");
+    private readonly string _longUrlStr = "https://example.com/page";
+
+    [Fact]
+    public void CreateShortUrl_CreatesNewShortUrl_WhenNoneExists()
+    {
+        // Arrange
+        var mapUrl = new MapUrl(_generator, _dataStore);
+        var longUrl = new Uri(_longUrlStr);
+
+        // Act
+        var shortUrl = mapUrl.CreateShortUrl(longUrl);
+
+        // Assert
+        shortUrl.Should().NotBeNull();
+        _dataStore.Data.Should().ContainSingle(d => d.LongUrl == longUrl && d.ShortUrl == shortUrl);
+    }
+
     [Fact]
     public void CreateShortUrl_ReturnsExistingShortUrl_IfNotForceNew()
     {
         // Arrange
-        var longUrl = new Uri("https://example.com/page");
-        var existingShortUrl = new Uri("https://shor.ty/abc123");
-
-        var dataStore = Substitute.For<DataStore>();
-        dataStore.GetShortUrls(longUrl).Returns([existingShortUrl]);
-
-        var mapUrl = new MapUrl(_ => throw new Exception("Should not be called"), dataStore);
+        var mapUrl = new MapUrl(_generator, _dataStore);
+        var longUrl = new Uri(_longUrlStr);
+        var firstShortUrl = mapUrl.CreateShortUrl(longUrl);
 
         // Act
-        var result = mapUrl.CreateShortUrl(longUrl, forceNew: false);
+        var secondShortUrl = mapUrl.CreateShortUrl(longUrl);
 
         // Assert
-        result.Should().Be(existingShortUrl);
-        dataStore.Received(1).GetShortUrls(longUrl);
+        secondShortUrl.Should().Be(firstShortUrl);
+        _dataStore.Data.Count(d => d.LongUrl == longUrl).Should().Be(1);
     }
 
     [Fact]
-    public void CreateShortUrl_ReturnsPreferredShortUrl_IfAvailable()
+    public void CreateShortUrl_ForceNew_CreatesNewShortUrl()
     {
         // Arrange
-        var longUrl = new Uri("https://example.com/page");
-        var preferredShortUrl = new Uri("https://shor.ty/preferred");
-
-        var dataStore = Substitute.For<DataStore>();
-        dataStore.GetShortUrls(longUrl).Returns([]);
-        dataStore.AddUrlPair(preferredShortUrl, longUrl).Returns(true);
-
-        var mapUrl = new MapUrl(_ => throw new Exception("Should not be called"), dataStore);
+        var mapUrl = new MapUrl(_generator, _dataStore);
+        var longUrl = new Uri(_longUrlStr);
+        var firstShortUrl = mapUrl.CreateShortUrl(longUrl);
 
         // Act
-        var result = mapUrl.CreateShortUrl(longUrl, forceNew: false, preferredShortUrl: preferredShortUrl);
+        var secondShortUrl = mapUrl.CreateShortUrl(longUrl, forceNew: true);
+
+        // Assert
+        secondShortUrl.Should().NotBe(firstShortUrl);
+        _dataStore.Data.Count(d => d.LongUrl == longUrl).Should().Be(2);
+    }
+
+    [Fact]
+    public void CreateShortUrl_WithPreferredShortUrl_UsesPreferred()
+    {
+        // Arrange
+        var mapUrl = new MapUrl(_generator, _dataStore);
+        var longUrl = new Uri(_longUrlStr);
+        var preferredShortUrl = new Uri("https://shor.ty/custom");
+
+        // Act
+        var result = mapUrl.CreateShortUrl(longUrl, preferredShortUrl: preferredShortUrl);
 
         // Assert
         result.Should().Be(preferredShortUrl);
-        dataStore.Received(1).AddUrlPair(preferredShortUrl, longUrl);
+        _dataStore.Data.Should().Contain(d => d.ShortUrl == preferredShortUrl && d.LongUrl == longUrl);
     }
 
     [Fact]
-    public void CreateShortUrl_CreatesNewShortUrl_IfForceNewOrPreferredNotAvailable()
+    public void CreateShortUrl_WithPreferredShortUrl_ThrowsIfExistsForDifferentLongUrl()
     {
         // Arrange
-        var longUrl = new Uri("https://example.com/page");
-        var generatedShortUrl = new Uri("https://shor.ty/generated");
-
-        var dataStore = Substitute.For<DataStore>();
-        dataStore.GetShortUrls(longUrl).Returns([]);
-        dataStore.AddUrlPair(generatedShortUrl, longUrl).Returns(true);
-
-        var mapUrl = new MapUrl(_ => generatedShortUrl, dataStore);
+        var mapUrl = new MapUrl(_generator, _dataStore);
+        var longUrl1 = new Uri(_longUrlStr);
+        var longUrl2 = new Uri("https://example.com/other");
+        var preferredShortUrl = new Uri("https://shor.ty/custom");
+        _dataStore.Add(new ShortUrlData(preferredShortUrl, longUrl1));
 
         // Act
-        var result = mapUrl.CreateShortUrl(longUrl, forceNew: true);
+        Action act = () => mapUrl.CreateShortUrl(longUrl2, preferredShortUrl: preferredShortUrl);
 
         // Assert
-        result.Should().Be(generatedShortUrl);
-        dataStore.Received(1).AddUrlPair(generatedShortUrl, longUrl);
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("A short URL with the specified preferred short URL already exists for a different long URL.");
     }
 
     [Fact]
-    public void CreateShortUrl_ReturnsExistingPreferredShortUrl_IfNotForceNew()
+    public void DeleteShortUrl_RemovesShortUrl()
     {
         // Arrange
-        var longUrl = new Uri("https://example.com/page");
-        var preferredShortUrl = new Uri("https://shor.ty/preferred");
-
-        var dataStore = Substitute.For<DataStore>();
-        dataStore.GetShortUrls(longUrl).Returns([preferredShortUrl]);
-
-        var mapUrl = new MapUrl(_ => throw new Exception("Should not be called"), dataStore);
+        var mapUrl = new MapUrl(_generator, _dataStore);
+        var longUrl = new Uri(_longUrlStr);
+        var shortUrl = mapUrl.CreateShortUrl(longUrl);
 
         // Act
-        var result = mapUrl.CreateShortUrl(longUrl, forceNew: false, preferredShortUrl: preferredShortUrl);
+        var deleted = mapUrl.DeleteShortUrl(shortUrl);
 
         // Assert
-        result.Should().Be(preferredShortUrl);
+        deleted.Should().BeTrue();
+        _dataStore.Data.Should().NotContain(d => d.ShortUrl == shortUrl);
     }
 
     [Fact]
-    public void DeleteShortUrl_DelegatesToDataStore()
+    public void DeleteShortUrl_ReturnsFalse_IfShortUrlNotFound()
     {
         // Arrange
-        var shortUrl = new Uri("https://shor.ty/abc123");
-        var dataStore = Substitute.For<DataStore>();
-        dataStore.DeleteShortUrl(shortUrl).Returns(true);
-
-        var mapUrl = new MapUrl(_ => throw new Exception("Should not be called"), dataStore);
+        var mapUrl = new MapUrl(_generator, _dataStore);
+        var shortUrl = new Uri("https://shor.ty/notfound");
 
         // Act
-        var result = mapUrl.DeleteShortUrl(shortUrl);
+        var deleted = mapUrl.DeleteShortUrl(shortUrl);
 
         // Assert
-        result.Should().BeTrue();
-        dataStore.Received(1).DeleteShortUrl(shortUrl);
+        deleted.Should().BeFalse();
     }
 }

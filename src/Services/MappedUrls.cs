@@ -13,9 +13,30 @@ public class MappedUrls(DataStore repository) : IMappedUrl
     /// <returns>
     /// The original long URL if found; otherwise, <c>null</c>.
     /// </returns>
-    public Uri? GetLongUrl(Uri shortUrl) => repository.GetLongUrl(shortUrl);
+    public Uri? GetLongUrl(Uri shortUrl)
+    {
+        var data = repository.Data.FirstOrDefault(d => d.ShortUrl == shortUrl);
 
-    public IEnumerable<Uri> GetShortUrls(Uri longUrl) => repository.GetShortUrls(longUrl);
+        if (data == null)
+            return null;
 
-    public int GetUsage(Uri shortUrl) => repository.GetLongUrlRedirects(shortUrl);
+        return data.Redirect();
+    }
+
+    public IEnumerable<Uri> GetShortUrls(Uri longUrl)
+        => [.. repository
+                .Data
+                .Where(d => d.LongUrl == longUrl)
+                .Select(d => d.ShortUrl)
+           ];
+
+    public int GetUsage(Uri shortUrl)
+    {
+        var data = repository.Data.FirstOrDefault(d => d.ShortUrl == shortUrl);
+
+        if (data == null)
+            return 0;
+
+        return data.Redirects;
+    }
 }

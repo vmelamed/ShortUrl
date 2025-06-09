@@ -1,5 +1,7 @@
 ﻿using ShortUrl.Abstractions;
+using ShortUrl.Services.ObjectModel;
 using ShortUrl.Services.Repository;
+using ShortUrl.Services.Sync;
 
 namespace ShortUrl.Services;
 
@@ -17,28 +19,43 @@ public class MapUrl(
     /// </summary>
     /// <param name="longUrl">The original URL to shorten.</param>
     /// <param name="forceNew">If true, forces creation of a new short URL even if one already exists for the original URL.</param>
-    /// <param name="preferredShortUrl">An optional preferred short URL to use, if available.</param>
+    /// <param name="preferredShortUrl">An optional preferred short URL to use, if available. Implies <paramref name="forceNew"/> regardless of its value. </param>
     /// <returns>The generated short URL as a <see cref="Uri"/>.</returns>
     public Uri CreateShortUrl(Uri longUrl, bool forceNew = false, Uri? preferredShortUrl = null)
     {
-        if (!forceNew)
-        {
-            // Check if a short URL already exists for the original URL
-            var existingShortUrl = preferredShortUrl is null
-                                        ? dataStore.GetShortUrls(longUrl).FirstOrDefault()
-                                        : dataStore.GetShortUrls(longUrl).FirstOrDefault(u => u == preferredShortUrl);
+        ShortUrlData? data = null;
 
-            if (existingShortUrl is not null)
-                return existingShortUrl;
+        using var _ = dataStore.Lock.UpgradeableReaderLock();
+
+        if (preferredShortUrl is not null)
+        {
+            data = dataStore
+                        .Data
+                        .FirstOrDefault(d => d.ShortUrl == preferredShortUrl)
+                        ;
+
+            if (data is not null && data.LongUrl != longUrl)
+                throw new InvalidOperationException("A short URL with the specified preferred short URL already exists for a different long URL.");
+
+            // else disregard forceNew, since we are using the preferred short URL
+        }
+        else
+        if (!forceNew)
+            // Check if a short URL already exists for the long URL
+            data = dataStore
+                        .Data
+                        .FirstOrDefault(d => d.LongUrl == longUrl)
+                        ;
+
+        if (data is null)
+        {
+            using var __ = dataStore.Lock.WriterLock();
+
+            data = new ShortUrlData(preferredShortUrl ?? createShortUrl(longUrl), longUrl);
+            dataStore.Add(data);
         }
 
-        if (preferredShortUrl is not null && dataStore.AddUrlPair(preferredShortUrl, longUrl))
-            return preferredShortUrl;
-
-        Uri shortUrl = createShortUrl(longUrl);
-
-        dataStore.AddUrlPair(shortUrl, longUrl);
-        return shortUrl;
+        return data.ShortUrl;
     }
 
     /// <summary>
@@ -47,5 +64,5 @@ public class MapUrl(
     /// <param name="shortUrl">The short URL to delete.</param>
     /// <returns>True if the short URL was successfully deleted; otherwise, false.</returns>
     public bool DeleteShortUrl(Uri shortUrl)
-        => dataStore.DeleteShortUrl(shortUrl);
+        => dataStore.Delete(shortUrl);
 }

@@ -1,131 +1,73 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 
+using ShortUrl.Services.ObjectModel;
 using ShortUrl.Services.Repository;
 
 namespace ShortUrl.UnitTests;
 
 public class DataStoreTests
 {
+    private readonly DataStore _dataStore = new();
+
     [Fact]
-    public void AddUrlPair_AddsAndRetrievesShortAndLongUrls()
+    public void Add_AddsShortUrlData_WhenNotExists()
     {
         // Arrange
-        var repo = new DataStore();
-        var shortUrl = new Uri("https://shor.ty/abc123");
+        var shortUrl = new Uri("https://shor.ty/abc");
         var longUrl = new Uri("https://example.com/page");
+        var data = new ShortUrlData(shortUrl, longUrl);
 
         // Act
-        var added = repo.AddUrlPair(shortUrl, longUrl);
-        var retrievedLongUrl = repo.GetLongUrl(shortUrl);
-        var retrievedShortUrls = repo.GetShortUrls(longUrl).ToList();
+        _dataStore.Add(data);
 
         // Assert
-        added.Should().BeTrue();
-        retrievedLongUrl.Should().Be(longUrl);
-        retrievedShortUrls.Should().Contain(shortUrl);
+        _dataStore.Data.Should().ContainSingle(d => d.ShortUrl == shortUrl && d.LongUrl == longUrl);
     }
 
     [Fact]
-    public void AddUrlPair_DuplicateShortUrl_ReturnsFalse()
+    public void Add_Throws_WhenShortUrlAlreadyExists()
     {
         // Arrange
-        var repo = new DataStore();
-        var shortUrl = new Uri("https://shor.ty/abc123");
-        var longUrl1 = new Uri("https://example.com/page1");
-        var longUrl2 = new Uri("https://example.com/page2");
-
-        // Act
-        var firstAdd = repo.AddUrlPair(shortUrl, longUrl1);
-        var secondAdd = repo.AddUrlPair(shortUrl, longUrl2);
-
-        // Assert
-        firstAdd.Should().BeTrue();
-        secondAdd.Should().BeFalse();
-    }
-
-    [Fact]
-    public void GetShortUrl_ReturnsFirstShortUrl()
-    {
-        // Arrange
-        var repo = new DataStore();
+        var shortUrl = new Uri("https://shor.ty/abc");
         var longUrl = new Uri("https://example.com/page");
-        var shortUrl1 = new Uri("https://shor.ty/abc123");
-        var shortUrl2 = new Uri("https://shor.ty/xyz789");
+        var data = new ShortUrlData(shortUrl, longUrl);
+        _dataStore.Add(data);
 
         // Act
-        repo.AddUrlPair(shortUrl1, longUrl);
-        repo.AddUrlPair(shortUrl2, longUrl);
-        var result = repo.GetShortUrls(longUrl);
+        Action act = () => _dataStore.Add(new ShortUrlData(shortUrl, new Uri("https://other.com/")));
 
         // Assert
-        //result.Should().Contain(shortUrl1).Or.Contain(shortUrl2);
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage($"Short URL '{shortUrl}' already exists in the data store.");
     }
 
     [Fact]
-    public void GetLongUrl_ReturnsNullIfNotFound()
+    public void Delete_RemovesShortUrlData_IfExists()
     {
         // Arrange
-        var repo = new DataStore();
+        var shortUrl = new Uri("https://shor.ty/abc");
+        var longUrl = new Uri("https://example.com/page");
+        var data = new ShortUrlData(shortUrl, longUrl);
+        _dataStore.Add(data);
+
+        // Act
+        var result = _dataStore.Delete(shortUrl);
+
+        // Assert
+        result.Should().BeTrue();
+        _dataStore.Data.Should().NotContain(d => d.ShortUrl == shortUrl);
+    }
+
+    [Fact]
+    public void Delete_ReturnsFalse_IfShortUrlNotFound()
+    {
+        // Arrange
         var shortUrl = new Uri("https://shor.ty/notfound");
 
         // Act
-        var result = repo.GetLongUrl(shortUrl);
+        var result = _dataStore.Delete(shortUrl);
 
         // Assert
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    public void GetShortUrls_ReturnsEmptyIfNotFound()
-    {
-        // Arrange
-        var repo = new DataStore();
-        var longUrl = new Uri("https://example.com/notfound");
-
-        // Act
-        var result = repo.GetShortUrls(longUrl);
-
-        // Assert
-        result.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void GetLongUrlRedirects_ReturnsStatistics()
-    {
-        // Arrange
-        var repo = new DataStore();
-        var shortUrl1 = new Uri("https://shor.ty/abc123");
-        var longUrl1 = new Uri("https://example.com/page1");
-        var shortUrl2 = new Uri("https://shor.ty/abc124");
-        var longUrl2 = new Uri("https://example.com/page2");
-
-        // Act
-        repo.AddUrlPair(shortUrl1, longUrl1);
-        repo.GetLongUrl(shortUrl1).Should().Be(longUrl1);
-        repo.GetLongUrl(shortUrl1).Should().Be(longUrl1);
-        repo.AddUrlPair(shortUrl2, longUrl2);
-
-        // Assert
-        repo.GetLongUrlRedirects(shortUrl1).Should().Be(2);
-        repo.GetLongUrlRedirects(shortUrl2).Should().Be(0);
-    }
-
-    [Fact]
-    public void DeleteShortUrl_ReturnsTrueFalse()
-    {
-        // Arrange
-        var repo = new DataStore();
-        var shortUrl1 = new Uri("https://shor.ty/abc123");
-        var longUrl1 = new Uri("https://example.com/page1");
-        var shortUrl2 = new Uri("https://shor.ty/abc124");
-
-        // Act
-        repo.AddUrlPair(shortUrl1, longUrl1);
-        repo.GetLongUrl(shortUrl1).Should().Be(longUrl1);
-        repo.GetLongUrl(shortUrl2).Should().BeNull();
-
-        // Assert
-        repo.DeleteShortUrl(shortUrl1).Should().BeTrue();
-        repo.DeleteShortUrl(shortUrl2).Should().BeFalse();
+        result.Should().BeFalse();
     }
 }
