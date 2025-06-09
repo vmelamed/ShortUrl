@@ -8,7 +8,7 @@ namespace ShortUrl.UnitTests;
 
 public class MapUrlTests
 {
-    private readonly DataStore _dataStore = new();
+    private readonly DataStore _dataStore = new(true);
     private readonly Func<Uri, Uri> _generator = longUrl => new Uri($"https://shor.ty/{Guid.NewGuid()}");
     private readonly string _longUrlStr = "https://example.com/page";
 

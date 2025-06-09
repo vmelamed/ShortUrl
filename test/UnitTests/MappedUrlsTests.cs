@@ -8,7 +8,7 @@ namespace ShortUrl.UnitTests;
 
 public class MappedUrlsTests
 {
-    private readonly DataStore _dataStore = new();
+    private readonly DataStore _dataStore = new(true);
     private readonly MappedUrls _mappedUrls;
 
     public MappedUrlsTests() => _mappedUrls = new MappedUrls(_dataStore);

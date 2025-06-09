@@ -7,7 +7,7 @@ namespace ShortUrl.UnitTests;
 
 public class DataStoreTests
 {
-    private readonly DataStore _dataStore = new();
+    private readonly DataStore _dataStore = new(true);
 
     [Fact]
     public void Add_AddsShortUrlData_WhenNotExists()

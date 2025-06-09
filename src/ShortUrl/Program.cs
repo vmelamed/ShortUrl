@@ -9,7 +9,7 @@ using ShortUrl.Services.Repository;
 var host = Host.CreateDefaultBuilder(args)
                     .ConfigureServices(
                         (context, services) => services
-                            .AddTransient<DataStore>()
+                            .AddTransient<DataStore>(_ => new DataStore(false))
                             .AddTransient<IMapUrl, MapUrl>()
                             .AddTransient<IMappedUrl, MappedUrls>()
                             .AddSingleton<Func<Uri, Uri>>(ShortUrlAlgorithm.CreateShortUrl)
